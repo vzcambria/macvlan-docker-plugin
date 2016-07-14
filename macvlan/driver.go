@@ -75,11 +75,32 @@ func (d *Driver) CreateNetwork(r *sdk.CreateNetworkRequest) error {
 	for _, v4 := range r.IPv4Data {
 		log.Debugf("IPv4Datat: %+v", v4)
 		netGw = v4.Gateway
+                log.Debugf("netGW: %#v", netGw)
 		_, netCidr, err = net.ParseCIDR(v4.Pool)
 		if err != nil {
 			return err
 		}
+                log.Debugf("netCidr: %#v", netCidr)
+
+                // mcc 
+                var newnetGw *net.IPNet
+                newnetGw, err = parseIPNet(netGw)
+                log.Debugf("newnetGw: %+v", newnetGw)
+                //netGw = newnetGw.net.IP;
+
+                var xip net.IP
+                var xipNet *net.IPNet
+                var xerr error 
+
+                xip, xipNet, xerr = net.ParseCIDR(netGw)
+                if xerr != nil { return xerr }
+                log.Debugf("xip: type: %T value: %+v", xip, xip)
+                log.Debugf("xipNet: type: %T value: %+v", xipNet, xipNet)
+                netGw = xip.String()
+                log.Debugf("netGw now set to: %+v", netGw)
 	}
+
+        log.Debugf("Again, netGw now set to: %+v", netGw)
 
 	n := &network{
 		id:        r.NetworkID,
@@ -102,6 +123,8 @@ func (d *Driver) CreateNetwork(r *sdk.CreateNetworkRequest) error {
 			}
 		}
 	}
+
+        log.Debugf("And again, netGw now set to: %+v", netGw)
 	d.addNetwork(n)
 	return nil
 }
@@ -227,8 +250,12 @@ func (d *Driver) Join(r *sdk.JoinRequest) (*sdk.JoinResponse, error) {
 		DstPrefix: containerIfacePrefix,
 	}
 
+// mcc 
+log.Debugf("getID: [ %+v ]", getID)
+// mcc
 	res := &sdk.JoinResponse{
 		InterfaceName:         *ifname,
+		Gateway:               getID.gateway,
 		DisableGatewayService: true,
 	}
 	log.Debugf("Join response: %+v", res)
@@ -255,6 +282,10 @@ func (d *Driver) DiscoverDelete(r *sdk.DiscoveryNotification) error {
 
 // existingNetChecks checks for networks that already exist in libnetwork cache
 func (d *Driver) existingNetChecks() {
+
+	// mcc 
+	log.Debugf("existingNetChecks Called: ")
+
 	// Request all networks on the endpoint without any filters
 	existingNets, err := d.client.ListNetworks("")
 	if err != nil {
@@ -272,6 +303,10 @@ func (d *Driver) existingNetChecks() {
 					log.Errorf("invalid cidr address in network [ %s ]: %v", v4.Subnet, err)
 				}
 			}
+
+                        log.Debugf("netGW: %#v", netGW)
+                        log.Debugf("netCidr: %#v", netCidr)
+
 			nw := &network{
 				id:        n.ID,
 				endpoints: endpointTable{},
